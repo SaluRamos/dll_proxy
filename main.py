@@ -3,91 +3,67 @@ import shutil
 import sys
 
 if __name__ == "__main__":
-    # 1. Validação do Argumento
     if len(sys.argv) < 2:
         print("Uso: python main.py <caminho_da_dll_original>")
-        print("Exemplo: python main.py C:/Jogos/Bin/steam_api64.dll")
         exit(1)
 
-    caminho_original = sys.argv[1]
+    original_path = sys.argv[1]
+    clean_all = True if sys.argv[2] == "True" else False
     
-    # Extrai apenas o nome do arquivo (ex: "steam_api64.dll") do caminho completo
-    nome_dll = os.path.basename(caminho_original)
-    # Extrai o nome sem extensão (ex: "steam_api64") para os arquivos .cpp e .def
-    nome_base = os.path.splitext(nome_dll)[0]
+    dll_name = os.path.basename(original_path)
+    dll_base_name = os.path.splitext(dll_name)[0]
 
-    # Verifica se o arquivo passado existe
-    if not os.path.exists(caminho_original):
-        print(f"Erro: O arquivo '{caminho_original}' não foi encontrado.")
+    if not os.path.exists(original_path):
+        print(f"Erro: O arquivo '{original_path}' não foi encontrado.")
         exit(1)
 
-    print(f"--- Processando: {nome_dll} ---")
-
-    # 2. Compilar o gerador (main.cpp)
-    # Assume que main.cpp está na mesma pasta deste script python
+    print(f"--- Processando: {dll_name} ---")
     if os.system("g++ main.cpp -o gerador.exe -limagehlp") != 0:
         print("Erro: Falha ao compilar main.cpp.")
         exit(1)
 
-    # 3. Trazer a DLL original para a pasta local
-    # O gerador precisa ler a DLL. Copiamos para a raiz do script para facilitar.
-    # Usamos try/except para o caso de você rodar o script já na pasta onde está a DLL.
     try:
-        shutil.copy(caminho_original, nome_dll)
+        shutil.copy(original_path, dll_name)
     except shutil.SameFileError:
-        pass # O arquivo já está aqui, segue o jogo
+        pass
 
-    # 4. Executar o gerador
     print("Gerando código proxy...")
-    # Usamos aspas f'"{nome_dll}"' para garantir que funcione mesmo se houver espaços
-    if os.system(f'gerador.exe "{nome_dll}"') != 0:
+    if os.system(f'gerador.exe "{dll_name}"') != 0:
         print("Erro: O gerador falhou. Verifique se a DLL é válida.")
-        # Limpeza de segurança
         if os.path.exists("gerador.exe"): os.remove("gerador.exe")
         exit(1)
 
-    # 5. Deletar a cópia da DLL original (Input)
-    # Precisamos liberar o nome "steam_api64.dll" para que o compilador possa criar a nova (Output)
-    # MAS, só deletamos se o arquivo original estiver em outra pasta, para não apagar sua DLL de backup.
-    caminho_local = os.path.abspath(nome_dll)
-    caminho_input_abs = os.path.abspath(caminho_original)
+    local_path = os.path.abspath(dll_name)
+    absolute_input_path = os.path.abspath(original_path)
 
-    if os.path.exists(caminho_local):
-        # Se estamos trabalhando numa cópia, deletamos a cópia
-        if caminho_local != caminho_input_abs:
-            os.remove(caminho_local)
+    if os.path.exists(local_path):
+        if local_path != absolute_input_path:
+            os.remove(local_path)
         else:
             print("Aviso: O input e o output são o mesmo local. O arquivo original será sobrescrito!")
-            # Em cenários reais de proxy, geralmente queremos sobrescrever ou renomear a original para .old
-            # Aqui vou apenas deixar o compilador sobrescrever.
 
-    # 6. Compilar a nova DLL (Proxy)
-    print(f"Compilando nova {nome_dll}...")
-    
-    # Monta o comando dinamicamente usando o nome da DLL
-    comando_compilacao = (
-        f"g++ -shared -o \"{nome_dll}\" \"{nome_base}.cpp\" \"{nome_base}.def\" "
+    print(f"Compilando nova {dll_name}...")
+    compilation_command = (
+        f"g++ -shared -o \"{dll_name}\" \"{dll_base_name}.cpp\" \"{dll_base_name}.def\" "
         "-s -static-libgcc -static-libstdc++"
     )
     
-    if os.system(comando_compilacao) != 0:
+    if os.system(compilation_command) != 0:
         print("Erro na compilação final.")
-        exit(1)
 
-    # 7. Limpeza dos arquivos temporários gerados
-    arquivos_temp = [
-        f"{nome_base}.cpp",
-        f"{nome_base}.asm",
-        f"{nome_base}.def",
-        "gerador.exe"
-    ]
+    if clean_all:
+        temp_files = [
+            f"{dll_base_name}.cpp",
+            f"{dll_base_name}.asm",
+            f"{dll_base_name}.def",
+            "gerador.exe"
+        ]
+        print("Limpando temporários...")
+        for file in temp_files:
+            if os.path.exists(file):
+                try:
+                    os.remove(file)
+                except:
+                    pass
 
-    print("Limpando temporários...")
-    for arq in arquivos_temp:
-        if os.path.exists(arq):
-            try:
-                os.remove(arq)
-            except:
-                pass
-
-    print(f"--- Sucesso! A nova DLL '{nome_dll}' foi criada nesta pasta. ---")
+    print(f"--- Sucesso! A nova DLL '{dll_name}' foi criada nesta pasta. ---")
