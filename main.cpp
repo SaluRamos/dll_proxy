@@ -146,7 +146,8 @@ void generateMainCPP(string name, vector<string> names)
 	std::fstream file;
 	file.open(name + ".cpp", std::ios::out);
 	file << "#include <windows.h>" << endl
-		 << endl;
+		<< "#include <stdio.h>" << endl
+		<< endl;
 
 	file << "struct " << name << "_dll { \n"
 		 << "\tHMODULE dll;\n";
@@ -189,6 +190,15 @@ void generateMainCPP(string name, vector<string> names)
 	file << "\t{" << std::endl;
 	file << "\tcase DLL_PROCESS_ATTACH:" << std::endl;
 	file << "\t{" << std::endl;
+
+	// --- NOVO CÓDIGO DE LOG AQUI ---
+	file << "\t\t// Log simples para verificar carregamento" << std::endl;
+    file << "\t\tFILE* fLog = fopen(\"proxy_log.txt\", \"a\");" << std::endl;
+    file << "\t\tif (fLog) {" << std::endl;
+    file << "\t\t\tfprintf(fLog, \"[" << name << ".dll] Carregada com sucesso! Handle: %p\\n\", hModule);" << std::endl;
+    file << "\t\t\tfclose(fLog);" << std::endl;
+    file << "\t\t}" << std::endl;
+	// -------------------------------
 
 	file << "\t\tCopyMemory(path + GetSystemDirectory(path, MAX_PATH - " << fileNameLength << "), \"\\\\" << name << ".dll\", " << fileNameLength + 1 << ");" << std::endl;
 	file << "\t\t" << name << ".dll = LoadLibrary(path);" << std::endl;
