@@ -14,4 +14,8 @@ second arg is '1' to delete temp files or '0' to not delete temp files.
   
 ```python main.py ./dlls/steam_api64.dll 1```  
   
-Notice: The real DLL must be in System32 to be found by the proxy DLL
+Notice: The real DLL must be in System32 to be found by the proxy DLL  
+  
+To recompile Dll from files inside output:  
+  
+```python main.py -recompiledll```  
