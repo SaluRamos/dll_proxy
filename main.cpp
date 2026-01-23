@@ -147,6 +147,7 @@ void generateMainCPP(string name, vector<string> names)
 	file.open(name + ".cpp", std::ios::out);
 	file << "#include <windows.h>" << endl
 		<< "#include <stdio.h>" << endl
+		<< "#include <string.h>" <<endl
 		<< endl;
 
 	file << "struct " << name << "_dll { \n"
@@ -157,7 +158,6 @@ void generateMainCPP(string name, vector<string> names)
 		file << "\tFARPROC Orignal" << names[i] << ";\n";
 	}
 	file << "} " << name << ";\n\n";
-
 	// Generate Exports
 	if (fileType == IMAGE_FILE_MACHINE_AMD64) // 64bit
 	{
@@ -165,10 +165,6 @@ void generateMainCPP(string name, vector<string> names)
 			 << "{" << endl;
 		for (int i = 0; i < names.size(); i++)
 		{
-			// __attribute__((naked)) diz ao GCC para não criar prólogo/epílogo de função
-			// asm volatile faz o jump. 
-			// "jmp *%0" é sintaxe AT&T para jump indireto
-			// "m" (...) passa o endereço da variável da struct como operando de memória
 			file << "\t__attribute__((naked)) void Fake" << names[i] << "() { asm volatile (\"jmp *%0\" : : \"m\" (" << name << ".Orignal" << names[i] << ")); }\n";
 		}
 		file << "}" << endl;
@@ -180,8 +176,9 @@ void generateMainCPP(string name, vector<string> names)
 			file << "__declspec(naked) void Fake" << names[i] << "() { _asm { jmp[" << name << ".Orignal" << names[i] << "] } }\n";
 		}
 	}
-
 	file << "\n";
+
+	//main código começa aqui
 
 	file << "BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {" << endl;
 
@@ -190,15 +187,6 @@ void generateMainCPP(string name, vector<string> names)
 	file << "\t{" << std::endl;
 	file << "\tcase DLL_PROCESS_ATTACH:" << std::endl;
 	file << "\t{" << std::endl;
-
-	// --- NOVO CÓDIGO DE LOG AQUI ---
-	file << "\t\t// Log simples para verificar carregamento" << std::endl;
-    file << "\t\tFILE* fLog = fopen(\"proxy_log.txt\", \"a\");" << std::endl;
-    file << "\t\tif (fLog) {" << std::endl;
-    file << "\t\t\tfprintf(fLog, \"[" << name << ".dll] Carregada com sucesso! Handle: %p\\n\", hModule);" << std::endl;
-    file << "\t\t\tfclose(fLog);" << std::endl;
-    file << "\t\t}" << std::endl;
-	// -------------------------------
 
 	file << "\t\tCopyMemory(path + GetSystemDirectory(path, MAX_PATH - " << fileNameLength << "), \"\\\\" << name << ".dll\", " << fileNameLength + 1 << ");" << std::endl;
 	file << "\t\t" << name << ".dll = LoadLibrary(path);" << std::endl;
