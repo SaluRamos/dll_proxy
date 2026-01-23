@@ -9,13 +9,19 @@ Based on [ProxiFy](https://www.codeproject.com/Articles/1179147/ProxiFy-Automati
   
 ### How to run
   
-first arg is dll path.  
-second arg is '1' to delete temp files or '0' to not delete temp files.  
+run ```python main.py```  
   
-```python main.py ./dlls/steam_api64.dll 1```  
+FLAGS:
+```-projectname``` used to place all generated stuff inside a folder with this name  
+```-dllpath``` path to the target dll  
+```-recompile``` recompile project dll  
   
-Notice: The real DLL must be in System32 to be found by the proxy DLL  
+Notice: With the base config, the real DLL must be in System32 to be found by the proxy DLL.  
   
-To recompile Dll from files inside output:  
+Example:  
   
-```python main.py -recompiledll```  
+```python main.py -projectname=example_name -dllpath=dlls/D3D11``` (does not requires '.dll' at the end)
+  
+after editing generated code inside 'example_name' project, run:  
+  
+```python main.py -projectname=example_name -recompile```
