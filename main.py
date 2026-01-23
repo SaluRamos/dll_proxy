@@ -8,10 +8,15 @@ if __name__ == "__main__":
         exit(1)
 
     original_path = sys.argv[1]
-    clean_all = True if sys.argv[2] == "True" else False
+    clean_all = bool(int(sys.argv[2]))
     
     dll_name = os.path.basename(original_path)
     dll_base_name = os.path.splitext(dll_name)[0]
+
+    if os.path.exists("output/"):
+        shutil.rmtree("output/")
+    if not os.path.exists("output/"):
+        os.mkdir("output")
 
     if not os.path.exists(original_path):
         print(f"Erro: O arquivo '{original_path}' não foi encontrado.")
@@ -30,8 +35,10 @@ if __name__ == "__main__":
     print("Gerando código proxy...")
     if os.system(f'gerador.exe "{dll_name}"') != 0:
         print("Erro: O gerador falhou. Verifique se a DLL é válida.")
-        if os.path.exists("gerador.exe"): os.remove("gerador.exe")
         exit(1)
+        
+    if os.path.exists("gerador.exe"): 
+        os.remove("gerador.exe")
 
     local_path = os.path.abspath(dll_name)
     absolute_input_path = os.path.abspath(original_path)
@@ -44,20 +51,21 @@ if __name__ == "__main__":
 
     print(f"Compilando nova {dll_name}...")
     compilation_command = (
-        f"g++ -shared -o \"{dll_name}\" \"{dll_base_name}.cpp\" \"{dll_base_name}.def\" "
-        "-s -static-libgcc -static-libstdc++"
+        f'g++ -shared -o "{dll_name}" "{dll_base_name}.cpp\" "{dll_base_name}.def" -s -static-libgcc -static-libstdc++'
     )
     
     if os.system(compilation_command) != 0:
         print("Erro na compilação final.")
 
+    shutil.move(dll_name, "output/")
+
+    temp_files = [
+        f"{dll_base_name}.cpp",
+        f"{dll_base_name}.asm",
+        f"{dll_base_name}.def",
+        "gerador.exe"
+    ]
     if clean_all:
-        temp_files = [
-            f"{dll_base_name}.cpp",
-            f"{dll_base_name}.asm",
-            f"{dll_base_name}.def",
-            "gerador.exe"
-        ]
         print("Limpando temporários...")
         for file in temp_files:
             if os.path.exists(file):
@@ -65,5 +73,11 @@ if __name__ == "__main__":
                     os.remove(file)
                 except:
                     pass
+    else:
+        for file in temp_files:
+            try:
+                shutil.move(file, "output/")
+            except Exception as e:
+                pass
 
     print(f"--- Sucesso! A nova DLL '{dll_name}' foi criada nesta pasta. ---")
