@@ -5,6 +5,7 @@ import sys
 project_name = ""
 recompile_dll = False
 dll_path = ""
+exe_path = ""
 
 def recompile_dll_func() -> None:
     if not os.path.exists(f"{project_name}/"):
@@ -38,6 +39,8 @@ if __name__ == "__main__":
             project_name = arg.split("=")[1]
         if "-dllpath" in arg:
             dll_path = arg.split("=")[1] + ".dll"
+        if "-exepath" in arg:
+            exe_path = arg.split("=")[1] + ".exe"
 
     if project_name == "":
         print("No project name in flags!")
@@ -68,7 +71,7 @@ if __name__ == "__main__":
         pass
 
     print("Gerando código proxy...")
-    if os.system(f'generator.exe "{dll_name}"') != 0:
+    if os.system(f'generator.exe "{dll_name}" "{exe_path}"') != 0:
         print("Erro: O generator falhou. Verifique se a DLL é válida.")
         exit(1)
         
@@ -85,6 +88,7 @@ if __name__ == "__main__":
     try:
         shutil.copy("MemoryModule.c", f"{project_name}/")
         shutil.copy("MemoryModule.h", f"{project_name}/")
+        shutil.copy("process_hollowing.h", f"{project_name}/")
     except Exception as e:
         print(f"Aviso: Não foi possível copiar os arquivos do MemoryModule: {e}")
 
