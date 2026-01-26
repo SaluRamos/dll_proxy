@@ -19,7 +19,7 @@ def recompile_dll_func() -> None:
 def generate_dll(dll_base_name:str, files_folder:str="") -> None:
     print(f"Compilando nova {dll_base_name}.dll")
     compilation_command = (
-        f'g++ -shared -o "{dll_base_name}.dll" "{files_folder}{dll_base_name}.cpp" "{files_folder}{dll_base_name}.def" -s -static-libgcc -static-libstdc++'
+        f'g++ -shared -o "{dll_base_name}.dll" "{files_folder}{dll_base_name}.cpp" "{files_folder}MemoryModule.c" "{files_folder}{dll_base_name}.def" -s -static-libgcc -static-libstdc++'
     )
     if os.system(compilation_command) != 0:
         print("Erro na compilação final.")
@@ -81,6 +81,12 @@ if __name__ == "__main__":
         else:
             print("Erro: O input e o output são o mesmo local.")
             sys.exit(1)
+
+    try:
+        shutil.copy("MemoryModule.c", f"{project_name}/")
+        shutil.copy("MemoryModule.h", f"{project_name}/")
+    except Exception as e:
+        print(f"Aviso: Não foi possível copiar os arquivos do MemoryModule: {e}")
 
     generate_dll(dll_base_name)
 
