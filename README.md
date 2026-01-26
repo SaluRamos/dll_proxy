@@ -1,7 +1,6 @@
 ### DLL Proxy
   
-Creates a new DLL which sits between a program and the original DLL to intercept calls.  
-The real DLL is embedded in the proxy.  
+Creates a new DLL that incorporates the original DLL, acting as a proxy.  
 Based on [ProxiFy](https://www.codeproject.com/Articles/1179147/ProxiFy-Automatic-Proxy-DLL-Generation)  
   
 ### Requirements
