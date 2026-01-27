@@ -378,8 +378,8 @@ void generateASM(string name)
 
 int main(int argc, char *argv[])
 {
-    if (argc < 2) {
-        cout << "Usage: generator.exe <path_to_dll>" << endl;
+    if (argc < 3) {
+        cout << "Usage: generator.exe <path_to_dll> <path_to_exe>" << endl;
         return 1;
     }
     std::vector<std::string> args(argv, argv + argc);
