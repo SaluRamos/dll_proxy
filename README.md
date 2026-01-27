@@ -6,6 +6,7 @@ Based on [ProxiFy](https://www.codeproject.com/Articles/1179147/ProxiFy-Automati
 ### Requirements
   
 - MinGW  
+- Python  
   
 ### How to run
   
