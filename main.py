@@ -45,6 +45,12 @@ if __name__ == "__main__":
     if project_name == "":
         print("No project name in flags!")
         sys.exit(1)
+    if dll_path == "":
+        print("No dll path in flags!")
+        sys.exit(1)
+    if exe_path == "":
+        print("No exe path in flags!")
+        sys.exit(1)
 
     if recompile_dll:
         recompile_dll_func()
