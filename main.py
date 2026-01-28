@@ -18,6 +18,13 @@ def recompile_dll_func() -> None:
             break
     sys.exit(1)
 
+def compile_dll(command:str, output_name:str) -> None:
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"Error: {result.stderr}")
+        sys.exit(1)
+    print(f"--- Sucesso! DLL proxy '{output_name}' foi criada ---")
+
 def generate_dll(dll_base_name:str) -> None:
     print(f"Compilando nova {dll_base_name}.dll")
     command = [
@@ -25,10 +32,23 @@ def generate_dll(dll_base_name:str) -> None:
         f"{project_name}/{dll_base_name}.cpp", f"{project_name}/MemoryModule.c",
         f"{project_name}/{dll_base_name}.def", "-s", "-static-libgcc", "-static-libstdc++"
     ]
-    result = subprocess.run(command, capture_output=True, text=True)
-    if result.returncode != 0:
-        print("Erro na compilação final.")
-        sys.exit(1)
+    compile_dll(command, command[3])
+
+    command[3] = f"{project_name}/{dll_base_name}_O3.dll"
+    command.append("-O3")
+    compile_dll(command, command[3])
+
+    command.pop()
+    command[3] = f"{project_name}/{dll_base_name}_Os.dll"
+    command.append("-Os")
+    compile_dll(command, command[3])
+
+    command.pop()
+    command[3] = f"{project_name}/{dll_base_name}_all.dll"
+    for x in ["-s", "-Os", "-ffunction-sections", "-fdata-sections",
+        "-Wl,--gc-sections", "-fno-exceptions", "-fno-rtti"]:
+        command.append(x)
+    compile_dll(command, command[3])
 
 if __name__ == "__main__":
 
@@ -95,6 +115,7 @@ if __name__ == "__main__":
         shutil.copy("utils/MemoryModule.c", f"{project_name}/")
         shutil.copy("utils/MemoryModule.h", f"{project_name}/")
         shutil.copy("utils/process_hollowing.h", f"{project_name}/")
+        shutil.copy("utils/your_main.h", f"{project_name}/")
     except Exception as e:
         print(f"erro ao copiar utils: {e}")
 
@@ -113,4 +134,3 @@ if __name__ == "__main__":
             pass
 
     generate_dll(dll_base_name)
-    print(f"--- Sucesso! DLL proxy '{dll_name}' foi criada ---")
