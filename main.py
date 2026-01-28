@@ -91,22 +91,19 @@ if __name__ == "__main__":
             print("Erro: O input e o output são o mesmo local.")
             sys.exit(1)
 
-    try:
-        shutil.copy("MemoryModule.c", f"{project_name}/")
-        shutil.copy("MemoryModule.h", f"{project_name}/")
-        shutil.copy("process_hollowing.h", f"{project_name}/")
-    except Exception as e:
-        print(f"Aviso: Não foi possível copiar os arquivos do MemoryModule: {e}")
+    shutil.copy("utils/MemoryModule.c", f"{project_name}/")
+    shutil.copy("utils/MemoryModule.h", f"{project_name}/")
+    shutil.copy("utils/process_hollowing.h", f"{project_name}/")
 
     generate_dll(dll_base_name)
 
-    temp_files = [
+    project_files = [
         f"{dll_base_name}.cpp",
         f"{dll_base_name}.asm",
         f"{dll_base_name}.def",
         "generator.exe"
     ]
-    for file in temp_files:
+    for file in project_files:
         try:
             shutil.move(file, f"{project_name}/")
         except Exception as e:
