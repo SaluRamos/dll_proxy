@@ -1,6 +1,7 @@
 import os
 import shutil
 import sys
+import subprocess
 
 project_name = ""
 recompile_dll = False
@@ -13,22 +14,21 @@ def recompile_dll_func() -> None:
         sys.exit(1)
     for file in os.listdir(f"{project_name}/"):
         if file.endswith(".cpp"):
-            generate_dll(os.path.splitext(os.path.basename(file))[0], f"{project_name}/")
+            generate_dll(os.path.splitext(os.path.basename(file))[0])
             break
     sys.exit(1)
 
-def generate_dll(dll_base_name:str, files_folder:str="") -> None:
+def generate_dll(dll_base_name:str) -> None:
     print(f"Compilando nova {dll_base_name}.dll")
-    compilation_command = (
-        f'g++ -shared -o "{dll_base_name}.dll" "{files_folder}{dll_base_name}.cpp" "{files_folder}MemoryModule.c" "{files_folder}{dll_base_name}.def" -s -static-libgcc -static-libstdc++'
-    )
-    if os.system(compilation_command) != 0:
+    command = [
+        "g++", "-shared", "-o", f"{project_name}/{dll_base_name}.dll",
+        f"{project_name}/{dll_base_name}.cpp", f"{project_name}/MemoryModule.c",
+        f"{project_name}/{dll_base_name}.def", "-s", "-static-libgcc", "-static-libstdc++"
+    ]
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode != 0:
         print("Erro na compilação final.")
         sys.exit(1)
-    if os.path.exists(f"{project_name}/{dll_base_name}.dll"):
-        os.remove(f"{project_name}/{dll_base_name}.dll")
-    if os.path.exists(f"{dll_base_name}.dll"):
-        shutil.move(f"{dll_base_name}.dll", f"{project_name}/")
 
 if __name__ == "__main__":
 
@@ -91,16 +91,19 @@ if __name__ == "__main__":
             print("Erro: O input e o output são o mesmo local.")
             sys.exit(1)
 
-    shutil.copy("utils/MemoryModule.c", f"{project_name}/")
-    shutil.copy("utils/MemoryModule.h", f"{project_name}/")
-    shutil.copy("utils/process_hollowing.h", f"{project_name}/")
-
-    generate_dll(dll_base_name)
+    try:
+        shutil.copy("utils/MemoryModule.c", f"{project_name}/")
+        shutil.copy("utils/MemoryModule.h", f"{project_name}/")
+        shutil.copy("utils/process_hollowing.h", f"{project_name}/")
+    except Exception as e:
+        print(f"erro ao copiar utils: {e}")
 
     project_files = [
         f"{dll_base_name}.cpp",
         f"{dll_base_name}.asm",
         f"{dll_base_name}.def",
+        f"dll_binary.h",
+        f"exe_binary.h",
         "generator.exe"
     ]
     for file in project_files:
@@ -109,4 +112,5 @@ if __name__ == "__main__":
         except Exception as e:
             pass
 
+    generate_dll(dll_base_name)
     print(f"--- Sucesso! DLL proxy '{dll_name}' foi criada ---")
