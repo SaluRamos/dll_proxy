@@ -1,7 +1,6 @@
 #include <iostream>
-#include <Windows.h>
+#include <windows.h>
 #include <Commdlg.h>
-#include <String.h>
 #include <winnt.h>
 #include <imagehlp.h>
 #include <vector>
@@ -10,7 +9,6 @@
 #include <tchar.h>
 #include <stdio.h>
 #include <iomanip>
-#include <iostream>
 
 using namespace std;
 

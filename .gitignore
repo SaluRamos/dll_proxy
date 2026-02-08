@@ -1,5 +1,8 @@
 __pycache__/
 */
+!generic/
+generic/*.exe
+generic/*.dll
 !utils/
-exec.bat
+/exec.bat
 generator.exe
