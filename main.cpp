@@ -19,8 +19,7 @@ struct RawFile {
     DWORD size;
 };
 
-RawFile GetFileContent(const char* lpFilePath)
-{
+RawFile GetFileContent(const char* lpFilePath) {
 	RawFile result = { nullptr, 0 };
 	// Abre o arquivo
     HANDLE hFile = CreateFileA(lpFilePath, GENERIC_READ, 0, nullptr, OPEN_EXISTING, 0, nullptr);
@@ -61,7 +60,6 @@ RawFile GetFileContent(const char* lpFilePath)
     return result;
 }
 
-// Check if its 32bit or 64bit
 WORD fileType;
 vector<string> names;
 
@@ -183,7 +181,7 @@ void generateDEF(string name, vector<string> names) {
     file.close();
 }
 
-bool generateMainCPP(string name, vector<string> names, string originalDllPath, RawFile exe) {
+bool generateMainCPP(string name, vector<string> names, string originalDllPath, RawFile exe, bool useLogs) {
     // Ler o binário da DLL original
     vector<unsigned char> dllData;
     if (!getFileContent(originalDllPath, dllData)) {
@@ -198,7 +196,7 @@ bool generateMainCPP(string name, vector<string> names, string originalDllPath, 
     file << "#include <string>" << std::endl;
     file << "#include <iostream>" << std::endl;
     file << "#include <vector>" << std::endl;
-    file << "#include \"MemoryModule.h\"" << std::endl;
+    file << "#include \"MemoryModule.hpp\"" << std::endl;
     file << "#include \"dll_binary.h\"" << std::endl;
     file << "#include \"your_main.h\"" << std::endl;
     file << std::endl;
@@ -218,9 +216,6 @@ bool generateMainCPP(string name, vector<string> names, string originalDllPath, 
     dllBinaryFile.close();
 
 
-
-
-
     file << "struct " << name << "_dll { \n"
          << "\tHMEMORYMODULE dll;\n";
     for (int i = 0; i < names.size(); i++)
@@ -230,17 +225,54 @@ bool generateMainCPP(string name, vector<string> names, string originalDllPath, 
     file << "} " << name << ";\n\n";
     // Generate Exports
     if (fileType == IMAGE_FILE_MACHINE_AMD64) {
-        file << "extern \"C\"" << std::endl
-             << "{" << std::endl;
-        for (int i = 0; i < names.size(); i++)
-        {
-            file << "\t__attribute__((naked)) void Fake" << names[i] << "() { asm volatile (\"jmp *%0\" : : \"m\" (" << name << ".Orignal" << names[i] << ")); }\n";
+        file << "extern \"C\"\n{\n";
+        file << "void LogToFile(const char* msg);\n"; 
+        for (int i = 0; i < names.size(); i++) {
+            if (useLogs) {
+                file << "\t__attribute__((naked)) void Fake" << names[i] << "() {\n";
+                file << "\t\tasm volatile (\n";
+                // 1. Salva registradores voláteis (7 regs = 56 bytes)
+                file << "\t\t\t\"push %%rax\\n\\t\" \"push %%rcx\\n\\t\" \"push %%rdx\\n\\t\" \"push %%r8\\n\\t\" \"push %%r9\\n\\t\" \"push %%r10\\n\\t\" \"push %%r11\\n\\t\"\n";
+                
+                // 2. Aloca Shadow Space (32 bytes). 
+                // A stack já estava alinhada após os pushes (56 + 8 return addr = 64).
+                // Subtrair 32 mantem alinhamento de 16 bytes.
+                file << "\t\t\t\"sub $32, %%rsp\\n\\t\"\n"; 
+                
+                // 3. Prepara argumento e chama
+                file << "\t\t\t\"mov %[str], %%rcx\\n\\t\"\n";
+                file << "\t\t\t\"call LogToFile\\n\\t\"\n";
+                
+                // 4. Restaura Stack e Registradores
+                file << "\t\t\t\"add $32, %%rsp\\n\\t\"\n";
+                file << "\t\t\t\"pop %%r11\\n\\t\" \"pop %%r10\\n\\t\" \"pop %%r9\\n\\t\" \"pop %%r8\\n\\t\" \"pop %%rdx\\n\\t\" \"pop %%rcx\\n\\t\" \"pop %%rax\\n\\t\"\n";
+                
+                // 5. Pula para original
+                file << "\t\t\t\"jmp *%[orig]\"\n";
+                file << "\t\t\t: : [str] \"r\" (\"" << names[i] << "\"), [orig] \"m\" (" << name << ".Orignal" << names[i] << ") : \"memory\");\n";
+                file << "\t}\n";
+            } else {
+                file << "\t__attribute__((naked)) void Fake" << names[i] << "() { asm volatile (\"jmp *%0\" : : \"m\" (" << name << ".Orignal" << names[i] << ")); }\n";
+            }
         }
-        file << "}" << std::endl;
+        file << "}\n";
     } else {
         for (int i = 0; i < names.size(); i++)
         {
-            file << "__declspec(naked) void Fake" << names[i] << "() { _asm { jmp[" << name << ".Orignal" << names[i] << "] } }\n";
+            if (useLogs) {
+                file << "__declspec(naked) void Fake" << names[i] << "() {\n";
+                file << "\t_asm {\n";
+                file << "\t\tpushad\n"; // Salva todos os registradores de propósito geral
+                file << "\t}\n";
+                file << "\tLogToFile(\"" << name << "\\n\");\n";
+                file << "\t_asm {\n";
+                file << "\t\tpopad\n"; // Restaura os registradores
+                file << "\t\tjmp [" << name << ".Orignal" << names[i] << "]\n";
+                file << "\t}\n";
+                file << "}\n";
+            } else {
+                file << "__declspec(naked) void Fake" << names[i] << "() { _asm { jmp[" << name << ".Orignal" << names[i] << "] } }\n";
+            }
         }
     }
     file << "\n";
@@ -275,9 +307,9 @@ bool generateMainCPP(string name, vector<string> names, string originalDllPath, 
     file << "\t{" << std::endl;
     file << "\tcase DLL_PROCESS_ATTACH:" << std::endl;
     file << "\t{" << std::endl;
-    file << "\t\tYourMain();";
+    file << "\t\tYourMain();\n";
     // Carregamento via MemoryModule
-    file << "\t\t" << name << ".dll = MemoryLoadLibrary(originalDllData, sizeof(originalDllData));" << std::endl;
+    file << "\t\t" << name << ".dll = MemoryModule::MemoryLoadLibrary(originalDllData, sizeof(originalDllData));" << std::endl;
     file << "\t\tif (" << name << ".dll == NULL)" << std::endl;
     file << "\t\t{" << std::endl;
     file << "\t\t\tMessageBox(0, \"Cannot load embedded library from memory\", \"Proxy Error\", MB_ICONERROR);" << std::endl;
@@ -285,26 +317,25 @@ bool generateMainCPP(string name, vector<string> names, string originalDllPath, 
     file << "\t\t}" << std::endl;
     for (int i = 0; i < names.size(); i++)
     {
-        // GetProcAddress vira MemoryGetProcAddress
-        file << "\t\t" << name << ".Orignal" << names[i] << " = MemoryGetProcAddress(" << name << ".dll, \"" << names[i] << "\");" << std::endl;
+        file << "\t\t" << name << ".Orignal" << names[i] << " = MemoryModule::MemoryGetProcAddress(" << name << ".dll, \"" << names[i] << "\");" << std::endl;
     }
     file << "" << std::endl;
     file << "\t\tbreak;" << std::endl;
     file << "\t}" << std::endl;
     file << "\tcase DLL_PROCESS_DETACH:" << std::endl;
     file << "\t{" << std::endl;
-    file << "\t\tif (" << name << ".dll) MemoryFreeLibrary(" << name << ".dll);" << std::endl;
+    file << "\t\tif (" << name << ".dll) MemoryModule::MemoryFreeLibrary(" << name << ".dll);" << std::endl;
     file << "\t}" << std::endl;
     file << "\tbreak;" << std::endl;
     file << "\t}" << std::endl;
+    file << "\tYourEnd();" << std::endl;
     file << "\treturn TRUE;" << std::endl;
     file << "}" << std::endl;
     file.close();
     return true;
 }
 
-void generateASM(string name)
-{
+void generateASM(string name) {
     std::fstream file;
     file.open(name + ".asm", std::ios::out);
     file << ".data" << std::endl;
@@ -317,8 +348,7 @@ void generateASM(string name)
     file.close();
 }
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     if (argc < 3) {
         cout << "Usage: generator.exe <path_to_dll> <path_to_exe>" << std::endl;
         return 1;
@@ -342,7 +372,7 @@ int main(int argc, char *argv[])
     // Create Def File e CPP com binário embutido
     generateDEF(fileName, names);
     RawFile exe = GetFileContent(args[2].c_str());
-    if (!generateMainCPP(fileName, names, args[1], exe)) {
+    if (!generateMainCPP(fileName, names, args[1], exe, false)) {
         return 1;
     }
     if (fileType == IMAGE_FILE_MACHINE_AMD64) {

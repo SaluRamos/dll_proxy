@@ -29,7 +29,7 @@ def generate_dll(dll_base_name:str) -> None:
     print(f"Compilando nova {dll_base_name}.dll")
     command = [
         "g++", "-shared", "-o", f"{project_name}/{dll_base_name}.dll",
-        f"{project_name}/{dll_base_name}.cpp", f"{project_name}/MemoryModule.c",
+        f"{project_name}/{dll_base_name}.cpp",
         f"{project_name}/{dll_base_name}.def", "-s", "-static-libgcc", "-static-libstdc++"
     ]
     compile_dll(command, command[3])
@@ -112,8 +112,7 @@ if __name__ == "__main__":
             sys.exit(1)
 
     try:
-        shutil.copy("utils/MemoryModule.c", f"{project_name}/")
-        shutil.copy("utils/MemoryModule.h", f"{project_name}/")
+        shutil.copy("utils/MemoryModule.hpp", f"{project_name}/")
         shutil.copy("utils/process_hollowing.h", f"{project_name}/")
         shutil.copy("utils/your_main.h", f"{project_name}/")
     except Exception as e:
