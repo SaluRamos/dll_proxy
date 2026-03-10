@@ -4,9 +4,14 @@ import sys
 import subprocess
 
 project_name = ""
-recompile_dll = False
 dll_path = ""
 exe_path = ""
+
+project_files = [
+        "dll_binary.h",
+        "exe_binary.h",
+        "generator.exe"
+    ]
 
 def recompile_dll_func() -> None:
     if not os.path.exists(f"{project_name}/"):
@@ -15,7 +20,7 @@ def recompile_dll_func() -> None:
     for file in os.listdir(f"{project_name}/"):
         if file.endswith(".cpp"):
             generate_dll(os.path.splitext(os.path.basename(file))[0])
-            break
+            sys.exit(0)
     sys.exit(1)
 
 def compile_dll(command:str, output_name:str) -> None:
@@ -34,27 +39,26 @@ def generate_dll(dll_base_name:str) -> None:
     ]
     compile_dll(command, command[3])
 
-    command[3] = f"{project_name}/{dll_base_name}_O3.dll"
-    command.append("-O3")
-    compile_dll(command, command[3])
+    #ddls com otimizações
+    # command[3] = f"{project_name}/{dll_base_name}_O3.dll"
+    # command.append("-O3")
+    # compile_dll(command, command[3])
 
-    command.pop()
-    command[3] = f"{project_name}/{dll_base_name}_Os.dll"
-    command.append("-Os")
-    compile_dll(command, command[3])
+    # command.pop()
+    # command[3] = f"{project_name}/{dll_base_name}_Os.dll"
+    # command.append("-Os")
+    # compile_dll(command, command[3])
 
-    command.pop()
-    command[3] = f"{project_name}/{dll_base_name}_all.dll"
-    for x in ["-s", "-Os", "-ffunction-sections", "-fdata-sections",
-        "-Wl,--gc-sections", "-fno-exceptions", "-fno-rtti"]:
-        command.append(x)
-    compile_dll(command, command[3])
+    # command.pop()
+    # command[3] = f"{project_name}/{dll_base_name}_all.dll"
+    # for x in ["-s", "-Os", "-ffunction-sections", "-fdata-sections",
+    #     "-Wl,--gc-sections", "-fno-exceptions", "-fno-rtti"]:
+    #     command.append(x)
+    # compile_dll(command, command[3])
 
 if __name__ == "__main__":
 
     for arg in sys.argv[1:]:
-        if "-recompile" in arg:
-            recompile_dll = True
         if "-projectname" in arg:
             project_name = arg.split("=")[1]
         if "-dllpath" in arg:
@@ -72,14 +76,22 @@ if __name__ == "__main__":
         print("No exe path in flags!")
         sys.exit(1)
 
-    if recompile_dll:
-        recompile_dll_func()
     
     if not os.path.exists(dll_path):
         print(f"Erro: O arquivo '{dll_path}' não foi encontrado.")
         sys.exit(1)
     dll_name = os.path.basename(dll_path)
     dll_base_name = os.path.splitext(dll_name)[0]
+
+    project_files.append(f"{dll_base_name}.cpp")
+    project_files.append(f"{dll_base_name}.asm")
+    project_files.append(f"{dll_base_name}.def")
+    project_files.append(f"dll_binary.h")
+
+    #se project_folder existir e conter todos os project_files, esta recompilando
+    recompile_dll = os.path.exists(project_name) and all(os.path.exists(os.path.join(project_name, f)) for f in project_files)
+    if recompile_dll:
+        recompile_dll_func()
 
     if os.path.exists(f"{project_name}/"):
         shutil.rmtree(f"{project_name}/")
@@ -118,14 +130,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"erro ao copiar utils: {e}")
 
-    project_files = [
-        f"{dll_base_name}.cpp",
-        f"{dll_base_name}.asm",
-        f"{dll_base_name}.def",
-        f"dll_binary.h",
-        f"exe_binary.h",
-        "generator.exe"
-    ]
     for file in project_files:
         try:
             shutil.move(file, f"{project_name}/")

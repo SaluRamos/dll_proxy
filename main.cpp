@@ -221,56 +221,65 @@ bool generateMainCPP(string name, vector<string> names, string originalDllPath, 
         file << "\tFARPROC Orignal" << names[i] << ";\n";
     }
     file << "} " << name << ";\n\n";
+    
+    // Generate static strings for names
+    for (int i = 0; i < names.size(); i++) {
+        file << "static const char* " << names[i] << "_str = \"" << names[i] << "\";" << std::endl;
+    }
+    file << std::endl;
+
     // Generate Exports
     if (fileType == IMAGE_FILE_MACHINE_AMD64) {
         file << "extern \"C\"\n{\n";
-        file << "void LogToFile(const char* msg);\n"; 
+        file << "void FakeFunctionCall(const char* name, void* a1, void* a2, void* a3, void* a4);\n"; 
         for (int i = 0; i < names.size(); i++) {
-            if (useLogs) {
-                file << "\t__attribute__((naked)) void Fake" << names[i] << "() {\n";
-                file << "\t\tasm volatile (\n";
-                // 1. Salva registradores voláteis (7 regs = 56 bytes)
-                file << "\t\t\t\"push %%rax\\n\\t\" \"push %%rcx\\n\\t\" \"push %%rdx\\n\\t\" \"push %%r8\\n\\t\" \"push %%r9\\n\\t\" \"push %%r10\\n\\t\" \"push %%r11\\n\\t\"\n";
-                
-                // 2. Aloca Shadow Space (32 bytes). 
-                // A stack já estava alinhada após os pushes (56 + 8 return addr = 64).
-                // Subtrair 32 mantem alinhamento de 16 bytes.
-                file << "\t\t\t\"sub $32, %%rsp\\n\\t\"\n"; 
-                
-                // 3. Prepara argumento e chama
-                file << "\t\t\t\"mov %[str], %%rcx\\n\\t\"\n";
-                file << "\t\t\t\"call LogToFile\\n\\t\"\n";
-                
-                // 4. Restaura Stack e Registradores
-                file << "\t\t\t\"add $32, %%rsp\\n\\t\"\n";
-                file << "\t\t\t\"pop %%r11\\n\\t\" \"pop %%r10\\n\\t\" \"pop %%r9\\n\\t\" \"pop %%r8\\n\\t\" \"pop %%rdx\\n\\t\" \"pop %%rcx\\n\\t\" \"pop %%rax\\n\\t\"\n";
-                
-                // 5. Pula para original
-                file << "\t\t\t\"jmp *%[orig]\"\n";
-                file << "\t\t\t: : [str] \"r\" (\"" << names[i] << "\"), [orig] \"m\" (" << name << ".Orignal" << names[i] << ") : \"memory\");\n";
-                file << "\t}\n";
-            } else {
-                file << "\t__attribute__((naked)) void Fake" << names[i] << "() { asm volatile (\"jmp *%0\" : : \"m\" (" << name << ".Orignal" << names[i] << ")); }\n";
-            }
+            file << "\t__attribute__((naked)) void Fake" << names[i] << "() {\n";
+            file << "\t\tasm volatile (\n";
+            // 1. Salva registradores voláteis
+            file << "\t\t\t\"push %%rax\\n\\t\" \"push %%rcx\\n\\t\" \"push %%rdx\\n\\t\" \"push %%r8\\n\\t\" \"push %%r9\\n\\t\" \"push %%r10\\n\\t\" \"push %%r11\\n\\t\"\n";
+            
+            // 2. Aloca Shadow Space (32 bytes) + 8 bytes para o 5º argumento (arg4) + alinhamento
+            file << "\t\t\t\"sub $48, %%rsp\\n\\t\"\n"; 
+            
+            // 3. Prepara o nome da função (1º arg) PRIMEIRO para evitar overwrite se o compilador usar rdx/r8/r9/rax para %[str]
+            file << "\t\t\t\"mov %[str], %%rcx\\n\\t\"\n";
+
+            // 4. Recupera argumentos originais da stack
+            file << "\t\t\t\"mov 88(%%rsp), %%rdx\\n\\t\"\n"; // Arg1 para FakeFunctionCall (Original RCX)
+            file << "\t\t\t\"mov 80(%%rsp), %%r8\\n\\t\"\n";  // Arg2 para FakeFunctionCall (Original RDX)
+            file << "\t\t\t\"mov 72(%%rsp), %%r9\\n\\t\"\n";  // Arg3 para FakeFunctionCall (Original R8)
+            file << "\t\t\t\"mov 64(%%rsp), %%rax\\n\\t\"\n"; 
+            file << "\t\t\t\"mov %%rax, 32(%%rsp)\\n\\t\"\n"; // Arg4 para FakeFunctionCall (Original R9) - via stack
+            
+            file << "\t\t\t\"call FakeFunctionCall\\n\\t\"\n";
+            
+            // 5. Restaura Stack e Registradores
+            file << "\t\t\t\"add $48, %%rsp\\n\\t\"\n";
+            file << "\t\t\t\"pop %%r11\\n\\t\" \"pop %%r10\\n\\t\" \"pop %%r9\\n\\t\" \"pop %%r8\\n\\t\" \"pop %%rdx\\n\\t\" \"pop %%rcx\\n\\t\" \"pop %%rax\\n\\t\"\n";
+            
+            // 6. Pula para original
+            file << "\t\t\t\"jmp *%[orig]\"\n";
+            file << "\t\t\t: : [str] \"r\" (" << names[i] << "_str), [orig] \"m\" (" << name << ".Orignal" << names[i] << ") : \"memory\");\n";
+            file << "\t}\n";
         }
         file << "}\n";
     } else {
+        file << "extern \"C\" void FakeFunctionCall(const char* name, void* a1, void* a2, void* a3, void* a4);\n";
         for (int i = 0; i < names.size(); i++)
         {
-            if (useLogs) {
-                file << "__declspec(naked) void Fake" << names[i] << "() {\n";
-                file << "\t_asm {\n";
-                file << "\t\tpushad\n"; // Salva todos os registradores de propósito geral
-                file << "\t}\n";
-                file << "\tLogToFile(\"" << name << "\\n\");\n";
-                file << "\t_asm {\n";
-                file << "\t\tpopad\n"; // Restaura os registradores
-                file << "\t\tjmp [" << name << ".Orignal" << names[i] << "]\n";
-                file << "\t}\n";
-                file << "}\n";
-            } else {
-                file << "__declspec(naked) void Fake" << names[i] << "() { _asm { jmp[" << name << ".Orignal" << names[i] << "] } }\n";
-            }
+            file << "__declspec(naked) void Fake" << names[i] << "() {\n";
+            file << "\t_asm {\n";
+            file << "\t\tpushad\n"; 
+            file << "\t\tpush [esp + 32 + 16]\n"; // arg4
+            file << "\t\tpush [esp + 32 + 16]\n"; // arg3
+            file << "\t\tpush [esp + 32 + 16]\n"; // arg2
+            file << "\t\tpush [esp + 32 + 16]\n"; // arg1
+            file << "\t\tpush " << names[i] << "_str\n"; 
+            file << "\t\tcall FakeFunctionCall\n";
+            file << "\t\tadd esp, 20\n";
+            file << "\t\tpopad\n";
+            file << "\t\tjmp [" << name << ".Orignal" << names[i] << "]\n";
+            file << "\t}\n";
         }
     }
     file << "\n";
@@ -310,9 +319,11 @@ bool generateMainCPP(string name, vector<string> names, string originalDllPath, 
     file << "\t\t" << name << ".dll = MemoryModule::MemoryLoadLibrary(originalDllData, sizeof(originalDllData));" << std::endl;
     file << "\t\tif (" << name << ".dll == NULL)" << std::endl;
     file << "\t\t{" << std::endl;
-    file << "\t\t\tMessageBox(0, \"Cannot load embedded library from memory\", \"Proxy Error\", MB_ICONERROR);" << std::endl;
+    file << "\t\t\tMessageBox(0, \"failed to load dll functions\", \"Error\", MB_ICONERROR);" << std::endl;
     file << "\t\t\tExitProcess(0);" << std::endl;
     file << "\t\t}" << std::endl;
+    file << "\t\t//alterando a struct para apontar pro endereço real carregado na memoria" << std::endl;
+
     for (int i = 0; i < names.size(); i++)
     {
         file << "\t\t" << name << ".Orignal" << names[i] << " = MemoryModule::MemoryGetProcAddress(" << name << ".dll, \"" << names[i] << "\");" << std::endl;

