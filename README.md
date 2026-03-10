@@ -1,6 +1,6 @@
 ### DLL Proxy
   
-Creates a new DLL that incorporates the original DLL, acting as a proxy.  
+Red Team: Creates a new DLL that incorporates the original DLL, acting as a proxy.  
 Based on [ProxiFy](https://www.codeproject.com/Articles/1179147/ProxiFy-Automatic-Proxy-DLL-Generation)  
   
 ### Requirements

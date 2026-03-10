@@ -218,7 +218,7 @@ bool generateMainCPP(string name, vector<string> names, string originalDllPath, 
          << "\tHMEMORYMODULE dll;\n";
     for (int i = 0; i < names.size(); i++)
     {
-        file << "\tFARPROC Orignal" << names[i] << ";\n";
+        file << "\tFARPROC Original" << names[i] << ";\n";
     }
     file << "} " << name << ";\n\n";
     
@@ -252,13 +252,20 @@ bool generateMainCPP(string name, vector<string> names, string originalDllPath, 
             
             file << "\t\t\t\"call FakeFunctionCall\\n\\t\"\n";
             
+            // == SEQUESTRO DE RETORNO ==
+            file << "\t\t\t\"mov 104(%%rsp), %%rcx\\n\\t\"\n";
+            file << "\t\t\t\"mov %[str], %%rdx\\n\\t\"\n";
+            file << "\t\t\t\"call SetupReturnHook\\n\\t\"\n";
+            file << "\t\t\t\"mov %%rax, 104(%%rsp)\\n\\t\"\n";
+            // ==========================
+
             // 5. Restaura Stack e Registradores
             file << "\t\t\t\"add $48, %%rsp\\n\\t\"\n";
             file << "\t\t\t\"pop %%r11\\n\\t\" \"pop %%r10\\n\\t\" \"pop %%r9\\n\\t\" \"pop %%r8\\n\\t\" \"pop %%rdx\\n\\t\" \"pop %%rcx\\n\\t\" \"pop %%rax\\n\\t\"\n";
             
             // 6. Pula para original
             file << "\t\t\t\"jmp *%[orig]\"\n";
-            file << "\t\t\t: : [str] \"r\" (" << names[i] << "_str), [orig] \"m\" (" << name << ".Orignal" << names[i] << ") : \"memory\");\n";
+            file << "\t\t\t: : [str] \"r\" (" << names[i] << "_str), [orig] \"m\" (" << name << ".Original" << names[i] << ") : \"memory\");\n";
             file << "\t}\n";
         }
         file << "}\n";
@@ -276,7 +283,7 @@ bool generateMainCPP(string name, vector<string> names, string originalDllPath, 
             file << "\t\tcall FakeFunctionCall\n";
             file << "\t\tadd esp, 20\n";
             file << "\t\tpopad\n";
-            file << "\t\tjmp [" << name << ".Orignal" << names[i] << "]\n";
+            file << "\t\tjmp [" << name << ".Original" << names[i] << "]\n";
             file << "\t}\n";
         }
     }
@@ -324,7 +331,7 @@ bool generateMainCPP(string name, vector<string> names, string originalDllPath, 
 
     for (int i = 0; i < names.size(); i++)
     {
-        file << "\t\t" << name << ".Orignal" << names[i] << " = MemoryModule::MemoryGetProcAddress(" << name << ".dll, \"" << names[i] << "\");" << std::endl;
+        file << "\t\t" << name << ".Original" << names[i] << " = MemoryModule::MemoryGetProcAddress(" << name << ".dll, \"" << names[i] << "\");" << std::endl;
     }
     file << "" << std::endl;
     file << "\t\tbreak;" << std::endl;
