@@ -85,6 +85,15 @@ extern "C" void FakeFunctionCall(const char* fakeFunctionName, void* arg1, void*
     }
 }
 
+extern "C" void LogReturnValue(const char* fakeFunctionName, void* returnValue) {
+    std::ofstream logFile;
+    logFile.open("dll_logs.txt", std::ios::app);
+    if (logFile.is_open()) {
+        logFile << "[RET ] " << fakeFunctionName << " returns: " << returnValue << std::endl;
+        logFile.close();
+    }
+}
+
 void YourMain() {
 
 }

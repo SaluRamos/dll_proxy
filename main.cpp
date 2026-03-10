@@ -231,7 +231,6 @@ bool generateMainCPP(string name, vector<string> names, string originalDllPath, 
     // Generate Exports
     if (fileType == IMAGE_FILE_MACHINE_AMD64) {
         file << "extern \"C\"\n{\n";
-        file << "void FakeFunctionCall(const char* name, void* a1, void* a2, void* a3, void* a4);\n"; 
         for (int i = 0; i < names.size(); i++) {
             file << "\t__attribute__((naked)) void Fake" << names[i] << "() {\n";
             file << "\t\tasm volatile (\n";
@@ -264,7 +263,6 @@ bool generateMainCPP(string name, vector<string> names, string originalDllPath, 
         }
         file << "}\n";
     } else {
-        file << "extern \"C\" void FakeFunctionCall(const char* name, void* a1, void* a2, void* a3, void* a4);\n";
         for (int i = 0; i < names.size(); i++)
         {
             file << "__declspec(naked) void Fake" << names[i] << "() {\n";

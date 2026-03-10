@@ -32,7 +32,3 @@ Constructs a .cpp file that uses MemoryModule to load the binary array in to mem
 This .cpp file uses a DLL template that exports the same functions of the target dll.
 these functions uses assembly code that jumps to memory loaded target dll.
 The functionality is the same, but we can add any code to it.
-
-# actual work
-
-we are currently working on steam_api64.dll proxy, related files are inside "steam" folder
